@@ -1,0 +1,14 @@
+storage:
+  database: mhealth.db
+api:
+  port: 8080
+checks:
+  interval: 15
+  scripts:
+    - path: /bin/true
+      name: test
+  commands:
+    - name: systemctl
+      command: systemctl
+      args:
+        - status
