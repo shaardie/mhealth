@@ -15,28 +15,34 @@ const (
 				type              VARCHAR(64),
 				name              VARCHAR(64),
 				number_of_runs    INTEGER,
-				number_of_failure INTEGER,
+				number_of_failures INTEGER,
 				last_updated      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
 				PRIMARY KEY (type, name)
 			);
 	`
 	createOrUpdateCheck = `
 		INSERT INTO checks
-			(type, name, number_of_runs, number_of_failure)
+			(type, name, number_of_runs, number_of_failures)
 		VALUES
 			(?, ?, 1, ?)
 		ON CONFLICT
 			(type, name)
 		DO UPDATE SET
 			number_of_runs=number_of_runs+1,
-			number_of_failure=CASE WHEN ? > 0 THEN (number_of_failure + 1) ELSE 0 END,
+			number_of_failures=CASE WHEN ? > 0 THEN (number_of_failures + 1) ELSE 0 END,
 			last_updated=CURRENT_TIMESTAMP;
 	`
 	getfailedChecks = `
 		SELECT COUNT(*)
 		FROM checks
-		WHERE number_of_failure!=0
-	  		AND last_updated >= Datetime('now', '-10 minutes');`
+		WHERE number_of_failures!=0
+			AND last_updated >= Datetime('now', '-10 minutes');
+	`
+	getChecks = `
+		SELECT type, name, number_of_runs, number_of_failures
+		FROM checks
+		WHERE last_updated >= Datetime('now', '-10 minutes');
+	`
 )
 
 type Config struct {
@@ -47,6 +53,7 @@ type DB struct {
 	db                  *sql.DB
 	CreateOrUpdateCheck *sql.Stmt
 	GetFailedChecks     *sql.Stmt
+	GetChecks           *sql.Stmt
 }
 
 func Init(cfg Config) (DB, error) {
@@ -69,6 +76,11 @@ func Init(cfg Config) (DB, error) {
 	}
 
 	db.GetFailedChecks, err = db.db.Prepare(getfailedChecks)
+	if err != nil {
+		return db, fmt.Errorf("failed to prepare statement, %w", err)
+	}
+
+	db.GetChecks, err = db.db.Prepare(getChecks)
 	if err != nil {
 		return db, fmt.Errorf("failed to prepare statement, %w", err)
 	}
